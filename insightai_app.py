@@ -12,10 +12,14 @@ st.markdown("<h1 style='text-align:center; color:#4CAF50;'>InsightAI - Customer 
 st.markdown("<p style='text-align:center;'>Upload customer feedback and let AI uncover top pain points and feature requests instantly.</p>", unsafe_allow_html=True)
 
 # -------------------------------
-# Load API Key from Secrets
+# Load API Key safely from Streamlit Secrets
 # -------------------------------
-api_key = os.environ.get("OPENAI_API_KEY") or st.secrets["OPENAI_API_KEY"]
-client = OpenAI(api_key=api_key)
+api_key = os.environ.get("OPENAI_API_KEY") or st.secrets.get("OPENAI_API_KEY")
+
+if not api_key:
+    st.error("⚠️ No OpenAI API key found. Please add it in Streamlit Secrets to run the app.")
+else:
+    client = OpenAI(api_key=api_key)
 
 # -------------------------------
 # File Upload Section
@@ -33,12 +37,12 @@ if uploaded_file:
     with st.expander("Preview Uploaded Data"):
         st.dataframe(data.head())
 
-    if 'feedback' in data.columns:
+    if 'feedback' in data.columns and api_key:
         st.subheader("Step 2: Analyze with AI")
         if st.button("Run Analysis"):
             with st.spinner("Analyzing feedback with GPT-4..."):
                 feedback_text = " ".join(data['feedback'].astype(str).tolist())
-                time.sleep(1)  # Simulate processing time
+                time.sleep(1)  # Simulate processing delay
                 
                 try:
                     response = client.chat.completions.create(
@@ -51,14 +55,10 @@ if uploaded_file:
                     )
                     insights = response.choices[0].message.content
                 except Exception as e:
-                    insights = f"Error analyzing feedback: {e}"
+                    insights = f"⚠️ Error analyzing feedback: {e}"
 
             # Display results nicely
             st.subheader("Step 3: Insights from AI")
-            st.markdown(f"<div style='background-color:#f9f9f9;padding:10px;border-radius:5px;'>{insights}</div>", unsafe_allow_html=True)
+            st.markdown(f"<div style='background-color:#f9f9f9;padding:10px;border-radius:5px;'>{insights}<
 
-    else:
-        st.error("❌ The uploaded CSV must have a column named 'feedback'.")
-else:
-    st.info("📂 Please upload a CSV file to get started.")
 
