@@ -1,48 +1,64 @@
 import streamlit as st
 import pandas as pd
-import openai
+from openai import OpenAI
+import os
+import time
 
-st.title("InsightAI - Customer Feedback Analyzer (AI-Powered)")
+# -------------------------------
+# Page Configuration
+# -------------------------------
+st.set_page_config(page_title="InsightAI - Feedback Analyzer", page_icon="🤖", layout="centered")
+st.markdown("<h1 style='text-align:center; color:#4CAF50;'>InsightAI - Customer Feedback Analyzer</h1>", unsafe_allow_html=True)
+st.markdown("<p style='text-align:center;'>Upload customer feedback and let AI uncover top pain points and feature requests instantly.</p>", unsafe_allow_html=True)
 
-# Step 1: Enter OpenAI API key
-api_key = st.text_input("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", type="password")
-if api_key:
-    openai.api_key = api_key
+# -------------------------------
+# Load API Key from Secrets
+# -------------------------------
+api_key = os.environ.get("OPENAI_API_KEY") or st.secrets["OPENAI_API_KEY"]
+client = OpenAI(api_key=api_key)
 
-st.write("Upload customer feedback data (CSV with a 'feedback' column) to analyze top pain points and feature requests.")
+# -------------------------------
+# File Upload Section
+# -------------------------------
+st.subheader("Step 1: Upload Your Feedback Data")
+uploaded_file = st.file_uploader("Upload a CSV with a 'feedback' column", type="csv", help="Make sure your CSV has a column named 'feedback'.")
 
-uploaded_file = st.file_uploader("Choose a CSV file", type="csv")
-
-if uploaded_file is not None:
+# -------------------------------
+# Analysis Section
+# -------------------------------
+if uploaded_file:
     data = pd.read_csv(uploaded_file)
-    st.write("Preview of uploaded data:")
-    st.write(data.head())
+    st.success(f"✅ File uploaded successfully! {len(data)} feedback records found.")
+    
+    with st.expander("Preview Uploaded Data"):
+        st.dataframe(data.head())
 
     if 'feedback' in data.columns:
-        st.write("Analyzing feedback with AI...")
+        st.subheader("Step 2: Analyze with AI")
+        if st.button("Run Analysis"):
+            with st.spinner("Analyzing feedback with GPT-4..."):
+                feedback_text = " ".join(data['feedback'].astype(str).tolist())
+                time.sleep(1)  # Simulate processing time
+                
+                try:
+                    response = client.chat.completions.create(
+                        model="gpt-4",
+                        messages=[
+                            {"role": "system", "content": "You are a product analyst. Summarize top pain points and feature requests from user feedback."},
+                            {"role": "user", "content": feedback_text}
+                        ],
+                        max_tokens=250
+                    )
+                    insights = response.choices[0].message.content
+                except Exception as e:
+                    insights = f"Error analyzing feedback: {e}"
 
-        feedback_text = " ".join(data['feedback'].astype(str).tolist())
+            # Display results nicely
+            st.subheader("Step 3: Insights from AI")
+            st.markdown(f"<div style='background-color:#f9f9f9;padding:10px;border-radius:5px;'>{insights}</div>", unsafe_allow_html=True)
 
-        if api_key:
-            try:
-                response = openai.ChatCompletion.create(
-                    model="gpt-4",
-                    messages=[
-                        {"role": "system", "content": "You are a product analyst. Summarize top pain points and feature requests from user feedback."},
-                        {"role": "user", "content": feedback_text}
-                    ],
-                    max_tokens=200
-                )
-                insights = response.choices[0].message["content"]
-            except Exception as e:
-                insights = f"Error analyzing feedback: {e}"
-        else:
-            insights = "Please enter your OpenAI API key above to analyze feedback."
-
-        st.subheader("Insights from Feedback")
-        st.text(insights)
     else:
-        st.error("CSV must have a 'feedback' column.")
+        st.error("❌ The uploaded CSV must have a column named 'feedback'.")
 else:
-    st.info("Please upload a CSV file to proceed.")
+    st.info("📂 Please upload a CSV file to get started.")
 
