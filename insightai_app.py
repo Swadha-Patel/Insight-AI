@@ -22,6 +22,27 @@ else:
     client = OpenAI(api_key=api_key)
 
 # -------------------------------
+# Function to get AI analysis with fallback model
+# -------------------------------
+def get_ai_insights(feedback_text):
+    models = ["gpt-4o", "gpt-3.5-turbo"]
+    for model in models:
+        try:
+            response = client.chat.completions.create(
+                model=model,
+                messages=[
+                    {"role": "system", "content": "You are a product analyst. Summarize top pain points and feature requests from user feedback."},
+                    {"role": "user", "content": feedback_text}
+                ],
+                max_tokens=250
+            )
+            return response.choices[0].message.content
+        except Exception as e:
+            if model == models[-1]:  # If even the last model fails
+                return f"⚠️ Error analyzing feedback: {e}"
+            continue  # Try the next model if current one fails
+
+# -------------------------------
 # File Upload Section
 # -------------------------------
 st.subheader("Step 1: Upload Your Feedback Data")
@@ -40,25 +61,16 @@ if uploaded_file:
     if 'feedback' in data.columns and api_key:
         st.subheader("Step 2: Analyze with AI")
         if st.button("Run Analysis"):
-            with st.spinner("Analyzing feedback with GPT-4..."):
+            with st.spinner("Analyzing feedback with AI..."):
                 feedback_text = " ".join(data['feedback'].astype(str).tolist())
                 time.sleep(1)  # Simulate processing delay
-                
-                try:
-                    response = client.chat.completions.create(
-                        model="gpt-4",
-                        messages=[
-                            {"role": "system", "content": "You are a product analyst. Summarize top pain points and feature requests from user feedback."},
-                            {"role": "user", "content": feedback_text}
-                        ],
-                        max_tokens=250
-                    )
-                    insights = response.choices[0].message.content
-                except Exception as e:
-                    insights = f"⚠️ Error analyzing feedback: {e}"
+                insights = get_ai_insights(feedback_text)
 
             # Display results nicely
             st.subheader("Step 3: Insights from AI")
-            st.markdown(f"<div style='background-color:#f9f9f9;padding:10px;border-radius:5px;'>{insights}<
+            st.markdown(f"<div style='background-color:#f9f9f9;padding:10px;border-radius:5px;'>{insights}</div>", unsafe_allow_html=True)
 
-
+    elif 'feedback' not in data.columns:
+        st.error("❌ The uploaded CSV must have a column named 'feedback'.")
+else:
+    st.info("📂 Please upload a CSV file to get started.")
