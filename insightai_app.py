@@ -3,12 +3,15 @@ import pandas as pd
 from openai import OpenAI
 import os
 import time
-import textwrap
 
+# -------------------------------
+# Fix file watcher error for Streamlit Cloud
+# -------------------------------
 os.environ["STREAMLIT_SERVER_FILE_WATCHER_TYPE"] = "none"
 
+# -------------------------------
 # Page Configuration
-
+# -------------------------------
 st.set_page_config(page_title="InsightAI - Feedback Analyzer", page_icon="🤖", layout="centered")
 
 st.markdown(
@@ -19,8 +22,9 @@ st.markdown(
     unsafe_allow_html=True
 )
 
-# Load API Key 
-
+# -------------------------------
+# Load API Key safely from Streamlit Secrets
+# -------------------------------
 api_key = os.environ.get("OPENAI_API_KEY") or st.secrets.get("OPENAI_API_KEY")
 
 if not api_key:
@@ -28,24 +32,25 @@ if not api_key:
 else:
     client = OpenAI(api_key=api_key)
 
-# Function to get AI insights
-
+# -------------------------------
+# Function to get AI insights with proper markdown
+# -------------------------------
 def get_ai_insights(feedback_text):
     models = ["gpt-4o", "gpt-3.5-turbo"]
     prompt = f"""
-    Analyze the following user feedback and output results in **Markdown format** with proper line breaks like this:
-    
+    Analyze the following user feedback and output in markdown format with headings and bullets exactly like this:
+
     ### Top Pain Points
-    - Point 1
-    - Point 2
+    - First pain point
+    - Second pain point
 
     ### Top Feature Requests
-    - Request 1
-    - Request 2
+    - First request
+    - Second request
 
     ### Recommended Improvements
-    - Improvement 1
-    - Improvement 2
+    - First improvement
+    - Second improvement
 
     Feedback:
     {feedback_text}
@@ -72,13 +77,24 @@ def get_ai_insights(feedback_text):
             else:
                 return f"⚠️ Error analyzing feedback: {e}"
 
-# File Upload Section
+# -------------------------------
+# Helper to render each section separately with colors
+# -------------------------------
+def render_section(title, content, color):
+    st.markdown(f"<h4 style='color:black; background-color:{color}; padding:6px; border-radius:5px;'>{title}</h4>", unsafe_allow_html=True)
+    for line in content.split("\n"):
+        if line.strip().startswith("-"):
+            st.markdown(line)
 
+# -------------------------------
+# File Upload Section
+# -------------------------------
 st.markdown("<h3 style='color:#2196F3;'>Step 1: Upload Your Feedback Data</h3>", unsafe_allow_html=True)
 uploaded_file = st.file_uploader("Upload a CSV with a 'feedback' column", type="csv", help="Make sure your CSV has a column named 'feedback'.")
 
+# -------------------------------
 # Analysis Section
-
+# -------------------------------
 if uploaded_file:
     data = pd.read_csv(uploaded_file)
     st.success(f"✅ File uploaded successfully! {len(data)} feedback records found.")
@@ -96,23 +112,19 @@ if uploaded_file:
 
             st.markdown("<h3 style='color:#4CAF50;'>Step 3: Results</h3>", unsafe_allow_html=True)
 
-            # Split sections by heading
-            sections = ai_output.split("### ")
-            for section in sections:
-                if section.strip():
-                    if section.lower().startswith("top pain points"):
-                        color = "#ffe0b2"  # orange
-                    elif section.lower().startswith("top feature requests"):
-                        color = "#bbdefb"  # blue
-                    elif section.lower().startswith("recommended improvements"):
-                        color = "#c8e6c9"  # green
-                    else:
-                        color = "#f9f9f9"
+            # Split sections properly
+            sections = {"Top Pain Points": "", "Top Feature Requests": "", "Recommended Improvements": ""}
+            current = None
+            for line in ai_output.split("\n"):
+                if line.startswith("### "):
+                    current = line.replace("### ", "").strip()
+                elif current in sections:
+                    sections[current] += line + "\n"
 
-                    st.markdown(
-                        f"<div style='background-color:{color};padding:15px;border-radius:5px;margin-bottom:10px;'>{section}</div>",
-                        unsafe_allow_html=True
-                    )
+            # Render each section with colors & bullets
+            render_section("Top Pain Points", sections["Top Pain Points"], "#ffe0b2")
+            render_section("Top Feature Requests", sections["Top Feature Requests"], "#bbdefb")
+            render_section("Recommended Improvements", sections["Recommended Improvements"], "#c8e6c9")
 
     elif 'feedback' not in data.columns:
         st.error("❌ The uploaded CSV must have a column named 'feedback'.")
