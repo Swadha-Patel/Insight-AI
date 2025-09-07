@@ -22,7 +22,7 @@ else:
     client = OpenAI(api_key=api_key)
 
 # -------------------------------
-# Function to get AI analysis with fallback model
+# Function to get AI insights with error handling & fallback
 # -------------------------------
 def get_ai_insights(feedback_text):
     models = ["gpt-4o", "gpt-3.5-turbo"]
@@ -38,9 +38,14 @@ def get_ai_insights(feedback_text):
             )
             return response.choices[0].message.content
         except Exception as e:
-            if model == models[-1]:  # If even the last model fails
+            error_msg = str(e)
+            if "insufficient_quota" in error_msg or "model_not_found" in error_msg:
+                if model != models[-1]:
+                    continue  # Try next model if quota or access error
+                else:
+                    return "⚠️ All models failed. Please check your OpenAI quota or billing settings."
+            else:
                 return f"⚠️ Error analyzing feedback: {e}"
-            continue  # Try the next model if current one fails
 
 # -------------------------------
 # File Upload Section
@@ -74,3 +79,4 @@ if uploaded_file:
         st.error("❌ The uploaded CSV must have a column named 'feedback'.")
 else:
     st.info("📂 Please upload a CSV file to get started.")
+
