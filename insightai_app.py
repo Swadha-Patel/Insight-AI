@@ -3,15 +3,12 @@ import pandas as pd
 from openai import OpenAI
 import os
 import time
+import textwrap
 
-# -------------------------------
-# Fix file watcher error for Streamlit Cloud
-# -------------------------------
 os.environ["STREAMLIT_SERVER_FILE_WATCHER_TYPE"] = "none"
 
-# -------------------------------
 # Page Configuration
-# -------------------------------
+
 st.set_page_config(page_title="InsightAI - Feedback Analyzer", page_icon="🤖", layout="centered")
 
 st.markdown(
@@ -22,9 +19,8 @@ st.markdown(
     unsafe_allow_html=True
 )
 
-# -------------------------------
-# Load API Key safely from Streamlit Secrets
-# -------------------------------
+# Load API Key 
+
 api_key = os.environ.get("OPENAI_API_KEY") or st.secrets.get("OPENAI_API_KEY")
 
 if not api_key:
@@ -32,26 +28,25 @@ if not api_key:
 else:
     client = OpenAI(api_key=api_key)
 
-# -------------------------------
-# Function to get AI insights with bullet points
-# -------------------------------
+# Function to get AI insights
+
 def get_ai_insights(feedback_text):
     models = ["gpt-4o", "gpt-3.5-turbo"]
     prompt = f"""
-    Analyze the following user feedback and output results in **this exact format with bullet points**:
+    Analyze the following user feedback and output results in **Markdown format** with proper line breaks like this:
     
     ### Top Pain Points
-    - bullet point 1
-    - bullet point 2
-    
+    - Point 1
+    - Point 2
+
     ### Top Feature Requests
-    - bullet point 1
-    - bullet point 2
-    
+    - Request 1
+    - Request 2
+
     ### Recommended Improvements
-    - actionable improvement 1
-    - actionable improvement 2
-    
+    - Improvement 1
+    - Improvement 2
+
     Feedback:
     {feedback_text}
     """
@@ -64,7 +59,7 @@ def get_ai_insights(feedback_text):
                     {"role": "system", "content": "You are a product manager analyzing user feedback for clear, actionable insights."},
                     {"role": "user", "content": prompt}
                 ],
-                max_tokens=600
+                max_tokens=700
             )
             return response.choices[0].message.content
         except Exception as e:
@@ -77,15 +72,13 @@ def get_ai_insights(feedback_text):
             else:
                 return f"⚠️ Error analyzing feedback: {e}"
 
-# -------------------------------
 # File Upload Section
-# -------------------------------
+
 st.markdown("<h3 style='color:#2196F3;'>Step 1: Upload Your Feedback Data</h3>", unsafe_allow_html=True)
 uploaded_file = st.file_uploader("Upload a CSV with a 'feedback' column", type="csv", help="Make sure your CSV has a column named 'feedback'.")
 
-# -------------------------------
 # Analysis Section
-# -------------------------------
+
 if uploaded_file:
     data = pd.read_csv(uploaded_file)
     st.success(f"✅ File uploaded successfully! {len(data)} feedback records found.")
@@ -102,7 +95,24 @@ if uploaded_file:
                 ai_output = get_ai_insights(feedback_text)
 
             st.markdown("<h3 style='color:#4CAF50;'>Step 3: Results</h3>", unsafe_allow_html=True)
-            st.markdown(f"<div style='background-color:#f9f9f9;padding:15px;border-radius:5px;font-size:16px;'>{ai_output}</div>", unsafe_allow_html=True)
+
+            # Split sections by heading
+            sections = ai_output.split("### ")
+            for section in sections:
+                if section.strip():
+                    if section.lower().startswith("top pain points"):
+                        color = "#ffe0b2"  # orange
+                    elif section.lower().startswith("top feature requests"):
+                        color = "#bbdefb"  # blue
+                    elif section.lower().startswith("recommended improvements"):
+                        color = "#c8e6c9"  # green
+                    else:
+                        color = "#f9f9f9"
+
+                    st.markdown(
+                        f"<div style='background-color:{color};padding:15px;border-radius:5px;margin-bottom:10px;'>{section}</div>",
+                        unsafe_allow_html=True
+                    )
 
     elif 'feedback' not in data.columns:
         st.error("❌ The uploaded CSV must have a column named 'feedback'.")
